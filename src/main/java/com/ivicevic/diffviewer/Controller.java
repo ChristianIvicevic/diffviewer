@@ -1,14 +1,20 @@
 package com.ivicevic.diffviewer;
 
+import com.ivicevic.diffviewer.algorithm.Diff;
 import com.ivicevic.diffviewer.components.EditorPane.EditorKind;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.concurrent.ExecutionException;
 import javax.swing.JFileChooser;
+import javax.swing.SwingWorker;
 import lombok.AccessLevel;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+import lombok.Value;
 
 public class Controller implements PropertyChangeListener {
   @Getter(AccessLevel.PACKAGE)
@@ -120,9 +126,33 @@ public class Controller implements PropertyChangeListener {
       return;
     }
 
-    final var diff =
-        model.getAlgorithm().buildDiff(originalText.split("\n"), modifiedText.split("\n"), true);
-    model.setDiff(diff);
-    model.setChangedLines(diff.getChangedLines());
+    new DiffWorker(model, originalText, modifiedText).execute();
+  }
+
+  @Value
+  @EqualsAndHashCode(callSuper = true)
+  @RequiredArgsConstructor
+  private static class DiffWorker extends SwingWorker<Diff, Object> {
+    Model model;
+    String originalText;
+    String modifiedText;
+
+    @Override
+    protected Diff doInBackground() {
+      return model
+          .getAlgorithm()
+          .buildDiff(originalText.split("\n"), modifiedText.split("\n"), true);
+    }
+
+    @Override
+    protected void done() {
+      try {
+        final var diff = get();
+        model.setDiff(diff);
+        model.setChangedLines(diff.getChangedLines());
+      } catch (final InterruptedException | ExecutionException e) {
+        throw new RuntimeException(e);
+      }
+    }
   }
 }
