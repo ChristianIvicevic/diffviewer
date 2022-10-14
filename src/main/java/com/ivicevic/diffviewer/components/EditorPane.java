@@ -15,6 +15,7 @@ import javax.swing.JButton;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
+import javax.swing.JViewport;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.DefaultHighlighter.DefaultHighlightPainter;
 import lombok.Getter;
@@ -50,12 +51,13 @@ public class EditorPane extends JPanel {
     add(loadFileButton, BorderLayout.PAGE_START);
 
     textArea = new JTextArea();
-    textArea.setFont(new Font("JetBrainsMono Nerd Font", Font.PLAIN, 14));
+    textArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 14));
     textArea.setEditable(false);
     textArea.setLineWrap(false);
     textArea.setText("No file loaded.");
 
     scrollPane = new JScrollPane(textArea);
+    scrollPane.getViewport().setScrollMode(JViewport.BACKINGSTORE_SCROLL_MODE);
     add(scrollPane, BorderLayout.CENTER);
   }
 
