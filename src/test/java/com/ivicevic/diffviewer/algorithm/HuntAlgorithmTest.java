@@ -22,7 +22,7 @@ class HuntAlgorithmTest {
                 new String[] {
                   "This", "is", "the", "most", "recent", "content", "and", "some", "text"
                 },
-                true);
+                DiffMode.LINES);
 
     final var expectedOriginal =
         List.of(

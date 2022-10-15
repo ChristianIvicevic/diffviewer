@@ -1,6 +1,7 @@
 package com.ivicevic.diffviewer;
 
 import com.ivicevic.diffviewer.algorithm.Diff;
+import com.ivicevic.diffviewer.algorithm.DiffMode;
 import com.ivicevic.diffviewer.components.EditorPane.EditorKind;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
@@ -141,7 +142,7 @@ public class Controller implements PropertyChangeListener {
     protected Diff doInBackground() {
       return model
           .getAlgorithm()
-          .buildDiff(originalText.split("\n"), modifiedText.split("\n"), true);
+          .buildDiff(originalText.split("\n"), modifiedText.split("\n"), DiffMode.LINES);
     }
 
     @Override

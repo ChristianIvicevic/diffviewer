@@ -1,14 +1,17 @@
 package com.ivicevic.diffviewer.components;
 
 import com.ivicevic.diffviewer.algorithm.Diff;
+import com.ivicevic.diffviewer.algorithm.DiffMode;
 import com.ivicevic.diffviewer.algorithm.HuntAlgorithm;
 import com.ivicevic.diffviewer.algorithm.commands.DeleteCommand;
 import com.ivicevic.diffviewer.algorithm.commands.EditCommand;
 import com.ivicevic.diffviewer.algorithm.commands.InsertCommand;
+import com.ivicevic.diffviewer.algorithm.commands.ModifyCommand;
 import com.ivicevic.diffviewer.algorithm.commands.VirtualKeepCommand;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Font;
+import java.util.Arrays;
 import java.util.List;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
@@ -32,6 +35,7 @@ public class EditorPane extends JPanel {
   private static final Color INSERT_CHARACTER_COLOR = new Color(151, 242, 149);
   private static final Color DELETE_LINE_COLOR = new Color(254, 232, 233);
   private static final Color DELETE_CHARACTER_COLOR = new Color(255, 182, 186);
+  private static final Color MODIFY_CHARACTER_COLOR = new Color(194, 216, 242);
   private static final Color VIRTUAL_LINE_COLOR = new Color(231, 231, 231);
 
   public EditorPane(final EditorKind editorKind) {
@@ -83,22 +87,27 @@ public class EditorPane extends JPanel {
     final var deleteLinePainter = new LinePainter(DELETE_LINE_COLOR);
     final var virtualLinePainter = new LinePainter(VIRTUAL_LINE_COLOR);
 
-    for (var i = 0; i < editScript.size(); ++i) {
-      final var command = editScript.get(i);
+    for (var line = 0; line < editScript.size(); ++line) {
+      final var command = editScript.get(line);
+      LinePainter painter = null;
 
       if (command instanceof VirtualKeepCommand) {
-        highlighter.addHighlight(
-            textArea.getLineStartOffset(i), textArea.getLineEndOffset(i), virtualLinePainter);
+        painter = virtualLinePainter;
       }
 
-      if (kind == EditorKind.ORIGINAL && command instanceof DeleteCommand) {
-        highlighter.addHighlight(
-            textArea.getLineStartOffset(i), textArea.getLineEndOffset(i), deleteLinePainter);
+      if (kind == EditorKind.ORIGINAL
+          && (command instanceof DeleteCommand || command instanceof ModifyCommand)) {
+        painter = deleteLinePainter;
       }
 
-      if (kind == EditorKind.MODIFIED && command instanceof InsertCommand) {
+      if (kind == EditorKind.MODIFIED
+          && (command instanceof InsertCommand || command instanceof ModifyCommand)) {
+        painter = insertLinePainter;
+      }
+
+      if (painter != null) {
         highlighter.addHighlight(
-            textArea.getLineStartOffset(i), textArea.getLineEndOffset(i), insertLinePainter);
+            textArea.getLineStartOffset(line), textArea.getLineEndOffset(line), painter);
       }
     }
   }
@@ -112,6 +121,8 @@ public class EditorPane extends JPanel {
         new ProxyHighlightPainter(new DefaultHighlightPainter(INSERT_CHARACTER_COLOR));
     final var deleteCharacterPainter =
         new ProxyHighlightPainter(new DefaultHighlightPainter(DELETE_CHARACTER_COLOR));
+    final var modifyCharacterPainter =
+        new ProxyHighlightPainter(new DefaultHighlightPainter(MODIFY_CHARACTER_COLOR));
 
     for (var row = 0; row < originalScript.size(); ++row) {
       final var original = originalScript.get(row);
@@ -123,24 +134,39 @@ public class EditorPane extends JPanel {
         continue;
       }
 
+      // Here we have to filter possible empty lines which would map Delete commands to Modify
+      // instead.
       final var charDiff =
-          algorithm.buildDiff(original.getText().split(""), modified.getText().split(""), false);
+          algorithm.buildDiff(
+              Arrays.stream(original.getText().split(""))
+                  .filter(s -> !s.isEmpty())
+                  .toArray(String[]::new),
+              Arrays.stream(modified.getText().split(""))
+                  .filter(s -> !s.isEmpty())
+                  .toArray(String[]::new),
+              DiffMode.CHARACTERS);
       final var lineEditScript =
           kind == EditorKind.ORIGINAL ? charDiff.getOriginal() : charDiff.getModified();
       final var highlighter = textArea.getHighlighter();
       for (var column = 0; column < lineEditScript.size(); ++column) {
         final var command = lineEditScript.get(column);
+        ProxyHighlightPainter painter = null;
+
         if (kind == EditorKind.ORIGINAL && command instanceof DeleteCommand) {
-          highlighter.addHighlight(
-              textArea.getLineStartOffset(row) + column,
-              textArea.getLineStartOffset(row) + column + 1,
-              deleteCharacterPainter);
+          painter = deleteCharacterPainter;
         }
         if (kind == EditorKind.MODIFIED && command instanceof InsertCommand) {
+          painter = insertCharacterPainter;
+        }
+        if (command instanceof ModifyCommand) {
+          painter = modifyCharacterPainter;
+        }
+
+        if (painter != null) {
           highlighter.addHighlight(
               textArea.getLineStartOffset(row) + column,
               textArea.getLineStartOffset(row) + column + 1,
-              insertCharacterPainter);
+              painter);
         }
       }
     }

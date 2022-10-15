@@ -1,7 +1,6 @@
 package com.ivicevic.diffviewer;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.clearInvocations;
@@ -12,6 +11,7 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.ivicevic.diffviewer.algorithm.Diff;
+import com.ivicevic.diffviewer.algorithm.DiffMode;
 import com.ivicevic.diffviewer.algorithm.HuntAlgorithm;
 import com.ivicevic.diffviewer.components.EditorPane.EditorKind;
 import java.beans.PropertyChangeEvent;
@@ -27,7 +27,7 @@ class ControllerTest {
   @BeforeEach
   void setUp() {
     final var algorithm = mock(HuntAlgorithm.class);
-    when(algorithm.buildDiff(any(String[].class), any(String[].class), anyBoolean()))
+    when(algorithm.buildDiff(any(String[].class), any(String[].class), any(DiffMode.class)))
         .thenReturn(new Diff(List.of(), List.of(), List.of()));
 
     model = mock(Model.class);

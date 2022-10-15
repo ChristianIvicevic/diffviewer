@@ -4,6 +4,7 @@ import com.ivicevic.diffviewer.algorithm.commands.DeleteCommand;
 import com.ivicevic.diffviewer.algorithm.commands.EditCommand;
 import com.ivicevic.diffviewer.algorithm.commands.InsertCommand;
 import com.ivicevic.diffviewer.algorithm.commands.KeepCommand;
+import com.ivicevic.diffviewer.algorithm.commands.ModifyCommand;
 import com.ivicevic.diffviewer.algorithm.commands.VirtualKeepCommand;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -34,7 +35,7 @@ public class HuntAlgorithm {
 
   private List<EditCommand> buildEditScript(final String[] original, final String[] modified) {
     final var P = buildLcsMatrix(original, modified);
-    final List<EditCommand> editScript = new ArrayList<>();
+    final var editScript = new ArrayList<EditCommand>();
 
     var i = original.length;
     var j = modified.length;
@@ -64,12 +65,34 @@ public class HuntAlgorithm {
     return editScript;
   }
 
-  public Diff buildDiff(
-      final String[] original, final String[] modified, final boolean addVirtualLines) {
-    final var editScript = buildEditScript(original, modified);
-    // Original script consists of keep and delete commands.
+  private List<EditCommand> groupEditScript(final List<EditCommand> editScript) {
+    // Merge consecutive Delete and Insert commands.
+    final List<EditCommand> groupedList =
+        editScript.stream()
+            .sequential()
+            .collect(ArrayList::new, HuntAlgorithm::groupByCommand, ArrayList::addAll);
+
+    // Transform consecutive Delete and Insert commands into Modify commands.
+    final List<EditCommand> mergedList =
+        groupedList.stream()
+            .sequential()
+            .collect(ArrayList::new, HuntAlgorithm::mergeIntoModify, ArrayList::addAll);
+
+    // Split consolidated commands into single-chars out of convenience at the cost of some
+    // performance.
+    return mergedList.stream()
+        .sequential()
+        .collect(ArrayList::new, HuntAlgorithm::splitBaseCommands, ArrayList::addAll);
+  }
+
+  public Diff buildDiff(final String[] original, final String[] modified, final DiffMode diffMode) {
+    var editScript = buildEditScript(original, modified);
+    if (diffMode == DiffMode.CHARACTERS) {
+      editScript = groupEditScript(editScript);
+    }
+    // Original script consists of keep, delete and modify commands.
     final var originalScript = new ArrayList<EditCommand>();
-    // Modified script consists of keep and insert commands.
+    // Modified script consists of keep, insert and modify commands.
     final var modifiedScript = new ArrayList<EditCommand>();
     final var changedLines = new HashSet<Integer>();
 
@@ -84,8 +107,19 @@ public class HuntAlgorithm {
         modifiedScript.add(command);
       }
 
+      if (command instanceof ModifyCommand) {
+        // Out of convenience we split the Modify command into its characters.
+        for (final var c : command.getText().toCharArray()) {
+          originalScript.add(new ModifyCommand(String.valueOf(c), ""));
+        }
+        for (final var c : ((ModifyCommand) command).getModified().toCharArray()) {
+          modifiedScript.add(new ModifyCommand("", String.valueOf(c)));
+        }
+      }
+
       // Align both sides by adding virtual lines.
-      if (addVirtualLines && (command instanceof KeepCommand || i == editScript.size() - 1)) {
+      if (diffMode == DiffMode.LINES
+          && (command instanceof KeepCommand || i == editScript.size() - 1)) {
         final var delta = Math.max(originalScript.size(), modifiedScript.size());
         var deltaOriginal = Math.max(0, delta - originalScript.size());
         var deltaModified = Math.max(0, delta - modifiedScript.size());
@@ -127,5 +161,59 @@ public class HuntAlgorithm {
     }
 
     return new Diff(originalScript, modifiedScript, consolidatedChangedLines);
+  }
+
+  private static void groupByCommand(final List<EditCommand> list, final EditCommand command) {
+    final var size = list.size();
+    if (size == 0) {
+      list.add(command);
+      return;
+    }
+
+    final var last = list.get(size - 1);
+    if (last instanceof DeleteCommand && command instanceof DeleteCommand) {
+      list.set(size - 1, new DeleteCommand(last.getText() + command.getText()));
+    } else if (last instanceof InsertCommand && command instanceof InsertCommand) {
+      list.set(size - 1, new InsertCommand(last.getText() + command.getText()));
+    } else {
+      list.add(command);
+    }
+  }
+
+  private static void mergeIntoModify(final List<EditCommand> list, final EditCommand command) {
+    final var size = list.size();
+    if (size == 0) {
+      list.add(command);
+      return;
+    }
+
+    final var last = list.get(size - 1);
+    if (last instanceof DeleteCommand && command instanceof InsertCommand) {
+      list.set(size - 1, new ModifyCommand(last.getText(), command.getText()));
+    } else {
+      list.add(command);
+    }
+  }
+
+  private static void splitBaseCommands(final List<EditCommand> list, final EditCommand command) {
+    if (command instanceof DeleteCommand) {
+      for (final var c : command.getText().toCharArray()) {
+        list.add(new DeleteCommand(String.valueOf(c)));
+      }
+      return;
+    }
+    if (command instanceof InsertCommand) {
+      for (final var c : command.getText().toCharArray()) {
+        list.add(new InsertCommand(String.valueOf(c)));
+      }
+      return;
+    }
+    if (command instanceof KeepCommand) {
+      for (final var c : command.getText().toCharArray()) {
+        list.add(new KeepCommand(String.valueOf(c)));
+      }
+      return;
+    }
+    list.add(command);
   }
 }
