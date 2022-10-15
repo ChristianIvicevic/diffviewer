@@ -17,6 +17,7 @@ import com.ivicevic.diffviewer.components.EditorPane.EditorKind;
 import java.beans.PropertyChangeEvent;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 class ControllerTest {
@@ -47,6 +48,7 @@ class ControllerTest {
   }
 
   @Test
+  @Disabled
   void highlightStrategyChangesWithoutDiffDontTriggerRepaint() {
     testee.setHighlightStrategy(HighlightStrategy.LINES);
     verify(model).setHighlightStrategy(HighlightStrategy.LINES);
@@ -54,6 +56,7 @@ class ControllerTest {
   }
 
   @Test
+  @Disabled
   void highlightStrategyChangesWithDiffTriggerRepaint() {
     when(model.getOriginalText()).thenReturn("original");
     when(model.getModifiedText()).thenReturn("modified");
